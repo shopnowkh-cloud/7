@@ -1,5 +1,13 @@
 import sys
 import os
+
+# Push Vercel's _vendor paths to the end so pip-installed packages take priority.
+# This prevents Vercel's bundled telegram stub from shadowing python-telegram-bot.
+_vendor_paths = [p for p in sys.path if "_vendor" in p]
+_other_paths = [p for p in sys.path if "_vendor" not in p]
+sys.path = _other_paths + _vendor_paths
+
+# Add project root so bot.py is importable
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import asyncio
