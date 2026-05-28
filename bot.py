@@ -3200,7 +3200,7 @@ def _register_handlers():
     application.add_handler(
         CommandHandler("cancel", on_cancel, filters=ptb_filters.ChatType.PRIVATE), group=0)
     application.add_handler(
-        MessageHandler(ptb_filters.ChatType.PRIVATE & ptb_filters.TEXT, on_private_message), group=1)
+        MessageHandler(ptb_filters.ChatType.PRIVATE & ptb_filters.TEXT & ~ptb_filters.COMMAND, on_private_message), group=1)
     application.add_handler(
         CallbackQueryHandler(on_callback_query), group=0)
     application.post_init = _on_startup
