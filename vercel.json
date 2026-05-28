@@ -6,7 +6,8 @@
   "outputDirectory": "artifacts/khmer-mini-app/dist/public",
   "functions": {
     "api/webhook.py": {
-      "maxDuration": 60
+      "maxDuration": 60,
+      "includeFiles": "bot.py"
     }
   },
   "rewrites": [
