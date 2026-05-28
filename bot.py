@@ -1001,15 +1001,12 @@ BTN_STOCK             = "📦 ស្តុក គូប៉ុង"
 BTN_USERS             = "👥 អ្នកប្រើប្រាស់"
 BTN_BUYERS            = "📋 របាយការណ៍ទិញ"
 BTN_PAYMENT           = "💳 ឈ្មោះ Payment"
-BTN_BAKONG            = "🔑 Bakong Token"
 BTN_CHANNEL           = "📢 Channel ID"
 BTN_ADMINS            = "👑 គ្រប់គ្រង Admin"
 BTN_MAINTENANCE       = "🛠 Maintenance Mode"
 BTN_BROADCAST         = "📢 ផ្សាយព័ត៌មាន"
 BTN_BACK_SETTINGS     = "⬅️ ត្រឡប់ទៅកំណត់"
 BTN_PAYMENT_EDIT      = "✏️ ប្តូរឈ្មោះ Payment"
-BTN_BAKONG_API_EDIT   = "✏️ ប្តូរ Bakong Token"
-BTN_BAKONG_TOKEN_INFO = "📅 ព័ត៌មាន Token"
 BTN_CHANNEL_EDIT      = "✏️ ប្តូរ Channel ID"
 BTN_CHANNEL_CLEAR     = "🗑 លុប Channel ID"
 BTN_ADMIN_ADD         = "➕ បន្ថែម Admin"
@@ -1034,8 +1031,8 @@ BTN_EMAIL_TOKEN_INFO  = "📅 ព័ត៌មាន Token"
 
 ADMIN_BUTTON_LABELS = {
     BTN_ADD_ACCOUNT, BTN_DELETE_TYPE, BTN_STOCK, BTN_USERS, BTN_BUYERS,
-    BTN_PAYMENT, BTN_BAKONG, BTN_CHANNEL, BTN_ADMINS, BTN_MAINTENANCE, BTN_BROADCAST,
-    BTN_BACK_SETTINGS, BTN_PAYMENT_EDIT, BTN_BAKONG_API_EDIT, BTN_BAKONG_TOKEN_INFO,
+    BTN_PAYMENT, BTN_CHANNEL, BTN_ADMINS, BTN_MAINTENANCE, BTN_BROADCAST,
+    BTN_BACK_SETTINGS, BTN_PAYMENT_EDIT,
     BTN_CHANNEL_EDIT, BTN_CHANNEL_CLEAR, BTN_ADMIN_ADD, BTN_ADMIN_REMOVE,
     BTN_MAINT_ON, BTN_MAINT_OFF,
     BTN_EMAIL_MGMT, BTN_EMAIL_NEW, BTN_EMAIL_LIST, BTN_EMAIL_DELETE,
@@ -1054,9 +1051,9 @@ ADMIN_SETTINGS_KB = ReplyKeyboardMarkup([
     [KeyboardButton(BTN_ADD_ACCOUNT),  KeyboardButton(BTN_DELETE_TYPE)],
     [KeyboardButton(BTN_STOCK),        KeyboardButton(BTN_BUYERS)],
     [KeyboardButton(BTN_USERS),        KeyboardButton(BTN_EMAIL_MGMT)],
-    [KeyboardButton(BTN_PAYMENT),      KeyboardButton(BTN_BAKONG)],
-    [KeyboardButton(BTN_CHANNEL),      KeyboardButton(BTN_ADMINS)],
-    [KeyboardButton(BTN_MAINTENANCE),  KeyboardButton(BTN_BROADCAST)],
+    [KeyboardButton(BTN_PAYMENT),      KeyboardButton(BTN_CHANNEL)],
+    [KeyboardButton(BTN_ADMINS),       KeyboardButton(BTN_MAINTENANCE)],
+    [KeyboardButton(BTN_BROADCAST)],
 ], resize_keyboard=True, is_persistent=True)
 
 CANCEL_INPUT_KB = ReplyKeyboardMarkup(
@@ -1068,11 +1065,6 @@ ADD_ACCOUNT_KB = ReplyKeyboardMarkup(
 PAYMENT_SUBMENU_KB = ReplyKeyboardMarkup(
     [[KeyboardButton(BTN_PAYMENT_EDIT)], [KeyboardButton(BTN_BACK_SETTINGS)]],
     resize_keyboard=True, is_persistent=True)
-
-BAKONG_SUBMENU_KB = ReplyKeyboardMarkup([
-    [KeyboardButton(BTN_BAKONG_API_EDIT), KeyboardButton(BTN_BAKONG_TOKEN_INFO)],
-    [KeyboardButton(BTN_BACK_SETTINGS)],
-], resize_keyboard=True, is_persistent=True)
 
 CHANNEL_SUBMENU_KB = ReplyKeyboardMarkup([
     [KeyboardButton(BTN_CHANNEL_EDIT), KeyboardButton(BTN_CHANNEL_CLEAR)],
@@ -1807,15 +1799,6 @@ async def _show_payment_inline(chat_id):
                    reply_markup=PAYMENT_SUBMENU_KB)
 
 
-async def _show_bakong_inline(chat_id):
-    api_t = BAKONG_API_TOKEN if BAKONG_API_TOKEN else "(មិនទាន់កំណត់)"
-    await send_msg(
-        chat_id,
-        f"🔑 <b>Bakong Token បច្ចុប្បន្ន៖</b>\n\n"
-        f"<code>{html.escape(api_t)}</code>",
-        reply_markup=BAKONG_SUBMENU_KB)
-
-
 def _decode_jwt_expiry(token: str):
     import base64
     try:
@@ -1851,19 +1834,7 @@ def _days_status(days_left) -> str:
 
 async def _send_combined_token_info(chat_id: int, reply_markup) -> None:
     lines = ["🔑 <b>Token Info</b>\n"]
-    lines.append("━━━ 🏦 Bakong ━━━")
-    token = BAKONG_API_TOKEN
-    if not token:
-        lines.append("❌ មិនទាន់មាន Bakong Token ទេ។")
-    else:
-        exp_dt, days_left = _decode_jwt_expiry(token)
-        lines.append(f"Token: <code>{html.escape(token[:10])}…</code>")
-        if exp_dt:
-            lines.append(f"📅 Expire: <b>{exp_dt.strftime('%Y-%m-%d %H:%M UTC')}</b>")
-            lines.append(f"⏳ ស្ថានភាព: {_days_status(days_left)}")
-        else:
-            lines.append("📅 Expire: <b>មិនអាចបំបែក JWT បាន</b>")
-    lines.append("\n━━━ 📧 Dropmail ━━━")
+    lines.append("━━━ 📧 Dropmail ━━━")
     if not DROPMAIL_API_TOKEN:
         lines.append("❌ មិនទាន់មាន Dropmail Token ទេ។")
     else:
@@ -1881,10 +1852,6 @@ async def _send_combined_token_info(chat_id: int, reply_markup) -> None:
         else:
             lines.append("📅 Expire: <b>មិន​ទាន់​កំណត់</b> — ចុច ✏️ ប្តូរ Token ដើម្បីកំណត់")
     await send_msg(chat_id, "\n".join(lines), reply_markup=reply_markup)
-
-
-async def _bakong_show_token_info(chat_id: int):
-    await _send_combined_token_info(chat_id, BAKONG_SUBMENU_KB)
 
 
 async def _show_maintenance_inline(chat_id):
@@ -1915,10 +1882,6 @@ async def _dispatch_admin_button(update: Update, user_id, chat_id, btn):
         await _export_buyers_report_inline(chat_id)
     elif btn == BTN_PAYMENT:
         await _show_payment_inline(chat_id)
-    elif btn == BTN_BAKONG:
-        await _show_bakong_inline(chat_id)
-    elif btn == BTN_BAKONG_TOKEN_INFO:
-        await _bakong_show_token_info(chat_id)
     elif btn == BTN_CHANNEL:
         await _show_channel_inline(chat_id)
     elif btn == BTN_ADMINS:
@@ -1931,9 +1894,6 @@ async def _dispatch_admin_button(update: Update, user_id, chat_id, btn):
     elif btn == BTN_PAYMENT_EDIT:
         await _prompt_admin_input(chat_id, user_id, "payment",
                                   "💳 សូមផ្ញើ <b>ឈ្មោះ Payment</b> ថ្មី:")
-    elif btn == BTN_BAKONG_API_EDIT:
-        await _prompt_admin_input(chat_id, user_id, "bakong_api",
-                                  "🔑 សូមផ្ញើ <b>Bakong Token</b> ថ្មី:")
     elif btn == BTN_CHANNEL_EDIT:
         await _prompt_admin_input(chat_id, user_id, "channel",
                                   "📢 សូមផ្ញើ <b>Channel ID</b> ថ្មី (ឧ. <code>-1001234567890</code>):")
@@ -2002,32 +1962,6 @@ async def _handle_admin_settings_input(chat_id, user_id, message_id, key, text):
         asyncio.create_task(run_sync(_save_sessions))
         await send_msg(chat_id,
                        f"✅ បានប្តូរឈ្មោះ Payment ទៅជា <b>{html.escape(PAYMENT_NAME)}</b>",
-                       reply_markup=_main_kb(user_id))
-        return True
-
-    if key in ("bakong", "bakong_api"):
-        if not raw:
-            await send_msg(chat_id, "សូមផ្ញើ Bakong token ថ្មី (ឬចុច 🚫 បោះបង់)")
-            return True
-        try:
-            KHQR(raw)
-        except Exception as e:
-            await send_msg(chat_id, f"❌ Token មិនត្រឹមត្រូវ៖ <code>{html.escape(str(e))}</code>")
-            return True
-        BAKONG_API_TOKEN = raw
-        await run_sync(_set_setting, "BAKONG_API_TOKEN", raw)
-        label = "Bakong Token"
-        BAKONG_TOKEN = BAKONG_API_TOKEN
-        try:
-            khqr_client = KHQR(BAKONG_TOKEN)
-        except Exception:
-            pass
-        asyncio.create_task(delete_msg(chat_id, message_id))
-        async with _data_lock:
-            user_sessions.pop(user_id, None)
-        asyncio.create_task(run_sync(_save_sessions))
-        await send_msg(chat_id,
-                       f"✅ បានប្តូរ <b>{label}</b> (Prefix: <code>{html.escape(raw[:10])}…</code>)",
                        reply_markup=_main_kb(user_id))
         return True
 
