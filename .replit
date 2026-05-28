@@ -24,23 +24,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Khmer Mini App API"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "Telegram Bot"
-
-[[workflows.workflow]]
-name = "Khmer Mini App API"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd /home/runner/workspace/artifacts/khmer-mini-app && node_modules/.bin/tsx server.ts"
-waitForPort = 3000
 
 [[workflows.workflow]]
 name = "Telegram Bot"
