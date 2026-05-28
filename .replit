@@ -56,4 +56,3 @@ exposeLocalhost = true
 [userenv]
 
 [userenv.shared]
-API_PORT = "3000"
