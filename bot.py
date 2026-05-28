@@ -13,6 +13,7 @@ except ImportError:
     pass
 
 import asyncio
+import concurrent.futures
 import hashlib
 import html
 import io
@@ -180,9 +181,11 @@ def get_user_lock(user_id: int) -> asyncio.Lock:
     return _user_locks[user_id]
 
 
+_thread_pool = concurrent.futures.ThreadPoolExecutor(max_workers=32)
+
 async def run_sync(fn, *args, **kwargs):
     loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, lambda: fn(*args, **kwargs))
+    return await loop.run_in_executor(_thread_pool, lambda: fn(*args, **kwargs))
 
 
 # ── 7a. PostgreSQL (Neon) DB setup ────────────────────────────────────────────
@@ -201,7 +204,7 @@ def _get_db_pool():
         return _db_pool
     with _db_pool_lock:
         if _db_pool is None:
-            _db_pool = psycopg2.pool.ThreadedConnectionPool(1, 10, _DB_URL)
+            _db_pool = psycopg2.pool.ThreadedConnectionPool(5, 20, _DB_URL)
     return _db_pool
 
 
@@ -232,6 +235,11 @@ application: Application = (
     ApplicationBuilder()
     .token(BOT_TOKEN)
     .concurrent_updates(True)
+    .read_timeout(10)
+    .write_timeout(10)
+    .connect_timeout(5)
+    .pool_timeout(5)
+    .connection_pool_size(16)
     .build()
 )
 _bot: Bot = application.bot
@@ -1268,7 +1276,7 @@ async def _release_reserved_accounts(session):
         pool = accounts_data.setdefault("account_types", {}).setdefault(account_type, [])
         accounts_data["account_types"][account_type] = list(reserved) + list(pool)
         session["reserved_accounts"] = []
-    await run_sync(_save_data)
+    asyncio.create_task(run_sync(_save_data))
     logger.info(f"Released {len(reserved)} reserved {account_type} account(s) back to pool")
 
 
@@ -1548,8 +1556,8 @@ async def deliver_accounts(chat_id, user_id, session, payment_data=None, user_na
                        parse_mode=ParseMode.MARKDOWN)
         return
 
-    await run_sync(_save_data)
-    await run_sync(_delete_pending_payment, user_id)
+    asyncio.create_task(run_sync(_save_data))
+    asyncio.create_task(run_sync(_delete_pending_payment, user_id))
     asyncio.create_task(run_sync(_save_purchase_history, user_id, account_type, quantity,
                                  session.get("total_price", 0), delivered))
 
