@@ -111,6 +111,9 @@ BAKONG_API_TOKEN   = os.environ.get("BAKONG_TOKEN", "")
 BAKONG_TOKEN       = BAKONG_RELAY_TOKEN if BAKONG_RELAY_TOKEN else BAKONG_API_TOKEN
 khqr_client        = KHQR(BAKONG_TOKEN) if BAKONG_TOKEN else None
 
+CAMBO_PAYMENT_BASE = "https://bakong.cambo-kh.com/api/payment"
+CAMBO_USER_TG_ID   = str(ADMIN_ID)
+
 
 DROPMAIL_API_TOKEN    = os.environ.get("DROPMAIL_API_TOKEN", "")
 DROPMAIL_TOKEN_EXPIRY = ""
@@ -911,90 +914,85 @@ def _compute_md5(qr: str) -> str:
 
 
 def _generate_payment_qr(amount):
-    if not BAKONG_TOKEN or not khqr_client:
-        return None, "BAKONG_TOKEN មិនមាន", None
+    """Generate QR via cambo-kh payment API. Returns (img_bytes, md5, qr_string)."""
     try:
-        bill_number = f"TRX{int(time.time())}"
-        try:
-            try:
-                qr = khqr_client.create_qr(
-                    bank_account="sovannrady@aclb", merchant_name=PAYMENT_NAME,
-                    merchant_city="KPS", amount=amount, currency="USD",
-                    store_label=PAYMENT_NAME, phone_number="85593330905",
-                    bill_number=bill_number, terminal_label="Cashier-01",
-                    static=False, expiration=1)
-            except TypeError:
-                qr = khqr_client.create_qr(
-                    bank_account="sovannrady@aclb", merchant_name=PAYMENT_NAME,
-                    merchant_city="KPS", amount=amount, currency="USD",
-                    store_label=PAYMENT_NAME, phone_number="85593330905",
-                    bill_number=bill_number, terminal_label="Cashier-01", static=False)
-            if "5303840" not in qr or "5404" not in qr:
-                qr = _build_khqr_manual(
-                    "sovannrady@aclb", PAYMENT_NAME, "KPS", amount,
-                    bill_number, "85593330905", PAYMENT_NAME, "Cashier-01")
-        except Exception as e:
-            return None, f"create_qr failed: {e}", None
+        url = (f"{CAMBO_PAYMENT_BASE}?type=generate_qr"
+               f"&user_tg_id={CAMBO_USER_TG_ID}&amount={amount:.2f}")
+        resp = http.get(url, timeout=15)
+        resp.raise_for_status()
+        data = resp.json()
+        logger.info(f"generate_qr response keys: {list(data.keys())}")
 
-        md5 = _compute_md5(qr)
+        # Extract md5
+        md5 = (data.get("md5") or
+               data.get("hash") or
+               (data.get("data") or {}).get("md5") or "")
+        if not md5:
+            return None, f"No md5 in response: {data}", None
+
+        # Extract QR image (base64 or nested)
+        img_b64 = (data.get("qr_image") or data.get("image") or
+                   data.get("qr_base64") or data.get("base64") or
+                   (data.get("data") or {}).get("qr_image") or
+                   (data.get("data") or {}).get("image") or "")
+
         img_bytes = None
-        try:
-            img_bytes = khqr_client.qr_image(qr, format="bytes")
-        except Exception as e1:
-            logger.warning(f"bakong-khqr image failed: {e1}")
-        if not img_bytes:
+        if img_b64:
+            try:
+                import base64 as _b64
+                raw = img_b64.split(",")[-1]
+                img_bytes = _b64.b64decode(raw)
+            except Exception:
+                try:
+                    r2 = http.get(img_b64, timeout=10)
+                    r2.raise_for_status()
+                    img_bytes = r2.content
+                except Exception:
+                    pass
+
+        # Fallback: build QR image from qr_string field
+        qr_string = (data.get("qr_string") or data.get("qr") or
+                     data.get("qr_code") or
+                     (data.get("data") or {}).get("qr_string") or "")
+        if not img_bytes and qr_string:
             try:
                 import qrcode as _qrcode
                 buf = io.BytesIO()
-                _qrcode.make(qr).save(buf, format="PNG")
+                _qrcode.make(qr_string).save(buf, format="PNG")
                 img_bytes = buf.getvalue()
-            except Exception as e2:
-                logger.warning(f"qrcode lib failed: {e2}")
+            except Exception as eq:
+                logger.warning(f"qrcode fallback failed: {eq}")
+
         if not img_bytes:
-            try:
-                resp = http.get(
-                    f"https://api.qrserver.com/v1/create-qr-code/?size=500x500&data={url_quote(qr)}",
-                    timeout=10)
-                resp.raise_for_status()
-                img_bytes = resp.content
-            except Exception as e3:
-                return None, f"All QR methods failed: {e3}", None
-        return img_bytes, md5, qr
+            return None, f"Could not extract QR image from API: {data}", None
+
+        return img_bytes, md5, qr_string or md5
     except Exception as e:
-        return None, f"Unexpected: {e}", None
-
-
-def _bakong_api_url(token=None):
-    t = token or BAKONG_TOKEN
-    if t and t.startswith("rbk"):
-        return "https://api.bakongrelay.com/v1"
-    return "https://api-bakong.nbc.gov.kh/v1"
+        return None, f"generate_qr API error: {e}", None
 
 
 def _check_payment_status(md5):
-    tokens = []
-    if BAKONG_RELAY_TOKEN:
-        tokens.append(BAKONG_RELAY_TOKEN)
-    if BAKONG_API_TOKEN and BAKONG_API_TOKEN not in tokens:
-        tokens.append(BAKONG_API_TOKEN)
-    if not tokens and BAKONG_TOKEN:
-        tokens.append(BAKONG_TOKEN)
-    for token in tokens:
-        try:
-            base = _bakong_api_url(token)
-            resp = http.post(
-                f"{base}/check_transaction_by_md5",
-                json={"md5": md5},
-                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-                timeout=10)
-            data = resp.json()
-            logger.info(f"check_payment via {'relay' if token.startswith('rbk') else 'bakong'}: "
-                        f"status={resp.status_code} responseCode={data.get('responseCode')}")
-            if data.get("responseCode") == 0:
-                return True, data.get("data", {})
-        except Exception as e:
-            logger.warning(f"check_payment token error: {e}")
-    return False, None
+    """Check payment status via cambo-kh API. Returns (is_paid, data)."""
+    try:
+        url = (f"{CAMBO_PAYMENT_BASE}?type=check_md5"
+               f"&user_tg_id={CAMBO_USER_TG_ID}&md5={md5}")
+        resp = http.get(url, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+        logger.info(f"check_md5 response: {data}")
+
+        status = str(data.get("status") or
+                     (data.get("data") or {}).get("status") or "").lower()
+        paid = (
+            status in ("paid", "success", "completed", "confirmed") or
+            data.get("paid") is True or
+            data.get("responseCode") == 0 or
+            (data.get("data") or {}).get("paid") is True
+        )
+        return paid, data.get("data") or data
+    except Exception as e:
+        logger.warning(f"check_md5 API error: {e}")
+        return False, None
 
 
 # ── 10. Global state ──────────────────────────────────────────────────────────
