@@ -4,6 +4,11 @@
   "installCommand": "npm install && cd artifacts/khmer-mini-app && npm install",
   "buildCommand": "cd artifacts/khmer-mini-app && ./node_modules/.bin/vite build --config vite.config.ts",
   "outputDirectory": "artifacts/khmer-mini-app/dist/public",
+  "functions": {
+    "api/webhook.py": {
+      "maxDuration": 60
+    }
+  },
   "rewrites": [
     {
       "source": "/((?!api/).*)",

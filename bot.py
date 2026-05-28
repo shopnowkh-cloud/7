@@ -3019,6 +3019,71 @@ async def _resume_scheduled_deletions():
 
 
 # ── 20. Startup ───────────────────────────────────────────────────────────────
+async def _on_startup_webhook(app_: Application):
+    """Startup for webhook/serverless mode — identical to _on_startup but without background tasks."""
+    global accounts_data, PAYMENT_NAME, MAINTENANCE_MODE, CHANNEL_ID
+    global BAKONG_TOKEN, BAKONG_RELAY_TOKEN, BAKONG_API_TOKEN, khqr_client, EXTRA_ADMIN_IDS
+    global DROPMAIL_API_TOKEN, DROPMAIL_TOKEN_EXPIRY, _DROPMAIL_URL
+
+    await run_sync(_init_db)
+
+    _sv = await run_sync(_get_setting, "MAINTENANCE_MODE")
+    if _sv is not None:
+        MAINTENANCE_MODE = str(_sv).lower() == "true"
+        logger.info(f"Loaded MAINTENANCE_MODE: {MAINTENANCE_MODE}")
+
+    _sv = await run_sync(_get_setting, "EXTRA_ADMIN_IDS")
+    if _sv:
+        try:
+            EXTRA_ADMIN_IDS = set(int(x) for x in json.loads(_sv))
+            logger.info(f"Loaded {len(EXTRA_ADMIN_IDS)} extra admin(s)")
+        except Exception:
+            pass
+
+    _sv_relay = await run_sync(_get_setting, "BAKONG_RELAY_TOKEN")
+    if _sv_relay:
+        BAKONG_RELAY_TOKEN = _sv_relay
+
+    _sv_api = await run_sync(_get_setting, "BAKONG_API_TOKEN")
+    if _sv_api:
+        BAKONG_API_TOKEN = _sv_api
+
+    _sv_legacy = await run_sync(_get_setting, "BAKONG_TOKEN")
+    if _sv_legacy and not _sv_relay and not _sv_api:
+        if _sv_legacy.startswith("rbk"):
+            BAKONG_RELAY_TOKEN = _sv_legacy
+        else:
+            BAKONG_API_TOKEN = _sv_legacy
+
+    BAKONG_TOKEN = BAKONG_RELAY_TOKEN if BAKONG_RELAY_TOKEN else BAKONG_API_TOKEN
+    if BAKONG_TOKEN:
+        try:
+            khqr_client = KHQR(BAKONG_TOKEN)
+        except Exception as e:
+            logger.error(f"Failed to rebuild KHQR client: {e}")
+
+    _sv = await run_sync(_get_setting, "TELEGRAM_CHANNEL_ID")
+    if _sv:
+        CHANNEL_ID = _sv.strip()
+
+    _sv = await run_sync(_get_setting, "DROPMAIL_API_TOKEN")
+    if _sv:
+        DROPMAIL_API_TOKEN = _sv
+        _DROPMAIL_URL = f"https://dropmail.me/api/graphql/{DROPMAIL_API_TOKEN}"
+
+    _sv = await run_sync(_get_setting, "DROPMAIL_TOKEN_EXPIRY")
+    if _sv:
+        DROPMAIL_TOKEN_EXPIRY = _sv
+
+    data = await run_sync(_load_data)
+    accounts_data.update(data)
+    await run_sync(_load_sessions)
+    await run_sync(_cleanup_expired_pending_payments)
+
+    me = await _bot.get_me()
+    logger.info(f"[Webhook] Bot ready: @{me.username}")
+
+
 async def _on_startup(app_: Application):
     global accounts_data, PAYMENT_NAME, MAINTENANCE_MODE, CHANNEL_ID
     global BAKONG_TOKEN, BAKONG_RELAY_TOKEN, BAKONG_API_TOKEN, khqr_client, EXTRA_ADMIN_IDS
