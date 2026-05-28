@@ -190,6 +190,6 @@ app.post("/api/users/:telegramId/send-qr", async (req, res) => {
 });
 
 const API_PORT = parseInt(process.env.API_PORT || "3000");
-app.listen(API_PORT, "127.0.0.1", () => {
+app.listen(API_PORT, "0.0.0.0", () => {
   console.log(`API server running on port ${API_PORT}`);
 });

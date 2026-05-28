@@ -4,3 +4,13 @@ psycopg2-binary
 bakong-khqr
 qrcode[pil]
 python-dotenv
+aiohttp
+bakong-khqr
+pillow
+psycopg2-binary
+python-dotenv
+python-telegram-bot
+qrcode[pil]
+requests
+telegram
+urllib3
