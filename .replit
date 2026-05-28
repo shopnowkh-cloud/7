@@ -24,22 +24,11 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Telegram Bot"
+args = "Khmer Mini App API"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Khmer Mini App API"
-
-[[workflows.workflow]]
-name = "Telegram Bot"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python3 bot.py"
+args = "Telegram Bot"
 
 [[workflows.workflow]]
 name = "Khmer Mini App API"
@@ -50,10 +39,22 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "sh -c 'cd /home/runner/workspace/artifacts/khmer-mini-app && node_modules/.bin/tsx server.ts'"
+args = "cd /home/runner/workspace/artifacts/khmer-mini-app && node_modules/.bin/tsx server.ts"
+waitForPort = 3000
+
+[[workflows.workflow]]
+name = "Telegram Bot"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python3 /home/runner/workspace/bot.py"
+
+[workflows.workflow.metadata]
+outputType = "console"
 
 [agent]
-stack = "PNPM_WORKSPACE"
+stack = "BEST_EFFORT_FALLBACK"
 expertMode = true
 
 [postMerge]
@@ -62,3 +63,13 @@ timeoutMs = 20000
 
 [nix]
 channel = "stable-25_05"
+
+[[ports]]
+localPort = 3000
+externalPort = 3000
+
+[userenv]
+
+[userenv.shared]
+API_PORT = "3000"
+PORT = "5000"
